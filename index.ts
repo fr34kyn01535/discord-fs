@@ -4,13 +4,13 @@ import * as ftpd from "simple-ftpd";
 
 var bot = new Discord.Client();
 
-var fileChannel = new FileChannel(bot,'536667092276215811', '536667818452582411');
+var fileChannel = new FileChannel(bot,process.env.GUILD,process.env.CHANNEL);
+ 
+
+bot.login(process.env.TOKEN);
 
 
-bot.login('NTM2NjY3MTYzMTQzMTc2MjE5.DyaBww.Bo2lTmXh0l90JKiRgfV0baEJI2w');
-
-
-ftpd({ host: '0.0.0.0', port: 1337, root: '/' }, (session) => {
+ftpd({ host: process.env.IP, port: process.env.PORT, root: '/' }, (session) => {
 
     session.on('pass', (username, password, cb) => {
         session.readOnly = false
