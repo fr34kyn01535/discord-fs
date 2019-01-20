@@ -1,0 +1,19 @@
+{
+  "name": "discord-storage-ftp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Sven Mawby",
+  "license": "ISC",
+  "dependencies": {
+    "discord": "^0.8.2",
+    "discord-storage": "^0.1.1",
+    "discord.js": "git+https://github.com/discordjs/discord.js.git#11.4-dev",
+    "simple-ftpd": "0.0.4",
+    "stat-mode": "^0.2.2",
+    "uuid": "^3.3.2"
+  }
+}
