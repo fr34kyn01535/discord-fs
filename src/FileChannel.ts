@@ -25,8 +25,7 @@ export default class FileChannel {
     }
     private async loadJournal(){
         await this.journal.Load();
-        this.journal.CreateDirectory("/");
-       //this.journal.CreateFile("/var/test.txt",Buffer.from("12354"))
+        if(this.journal.GetDirectory("/") == null) this.journal.CreateDirectory("/");
     }
 
     public stat(pathName,cb){

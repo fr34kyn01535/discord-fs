@@ -36,8 +36,8 @@ export class Journal {
     }
 
     public async Load(){
+        var messages = await this.channel.fetchMessages({ limit: 100 });
         return new Promise((resolve, reject) => {
-            this.channel.fetchMessages().then(messages => {
                 messages.filter(m => m.author.id == this.channel.client.user.id).forEach(message => {
                     try {
                         var entry = JSON.parse(message.content);
@@ -62,7 +62,6 @@ export class Journal {
                     }
                 });
                 resolve();
-            }).catch(reject);
         });
     }
 
