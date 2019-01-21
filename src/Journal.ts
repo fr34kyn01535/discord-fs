@@ -11,7 +11,7 @@ export const enum JOURNAL_ENTRY_TYPE {
 
 export class BaseJournalEntry{
     public readonly type : JOURNAL_ENTRY_TYPE;
-    public name: string
+    public name: string 
     public mid: string
     public changed:Date
     public created:Date

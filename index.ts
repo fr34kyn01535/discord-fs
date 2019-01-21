@@ -15,7 +15,7 @@ ftpd({ host: process.env.LISTEN_IP, port: process.env.PORT, externalHost: proces
     session.on('pass', (username, password, cb) => {
         session.readOnly = false
         cb(null, 'Welcome guest') 
-    }) 
+    })  
    
     session.on('stat', fileChannel.stat.bind(fileChannel));
     session.on('readdir',fileChannel.readdir.bind(fileChannel));

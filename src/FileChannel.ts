@@ -11,9 +11,10 @@ export default class FileChannel {
     constructor(client: Discord.Client ,guild: string,channel: string){
         if(!fs.existsSync("./tmp")) fs.mkdirSync("./tmp");
         client.on('ready',() => {
+            console.log("Connected to Discord...");
            this.guild = client.guilds.get(guild);
            this.channel = <Discord.TextChannel> this.guild.channels.get(channel);
-           this.journal = new Journal(this.channel);
+           this.journal = new Journal(this.channel); 
            this.loadJournal();
         });
 
@@ -59,7 +60,7 @@ export default class FileChannel {
     public readdir(pathName, cb){
         var files = this.journal.GetFiles(pathName);
         var directories = this.journal.GetChildDirectories(pathName);
-       cb(null,files.concat(directories));
+        cb(null,files.concat(directories));
     }
 
     public download(pathName,offset,cb){
