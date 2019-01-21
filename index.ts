@@ -10,7 +10,7 @@ var fileChannel = new FileChannel(bot,process.env.GUILD,process.env.CHANNEL);
 bot.login(process.env.TOKEN);
 
 
-ftpd({ host: process.env.IP, port: process.env.PORT, root: '/' }, (session) => {
+ftpd({ host: process.env.LISTEN_IP, port: process.env.PORT, externalHost: process.env.EXTERNAL_IP, root: '/' }, (session) => {
 
     session.on('pass', (username, password, cb) => {
         session.readOnly = false
