@@ -3,14 +3,13 @@ import * as Mode from "stat-mode";
 import { Journal } from "./Journal";
 import * as uuidv4 from "uuid/v4";
 import * as fs from "fs";
-import { callbackify } from "util";
-
 
 export default class FileChannel {
     private guild: Discord.Guild;
     private channel: Discord.TextChannel; 
     private journal: Journal;
     constructor(client: Discord.Client ,guild: string,channel: string){
+        if(!fs.existsSync("./tmp")) fs.mkdirSync("./tmp");
         client.on('ready',() => {
            this.guild = client.guilds.get(guild);
            this.channel = <Discord.TextChannel> this.guild.channels.get(channel);
