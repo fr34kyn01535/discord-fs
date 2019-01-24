@@ -5,7 +5,7 @@ discord-fs is a Discord bot that allows creating a virtual file system accesible
 ## Installation
 
 ```bash
-https://github.com/fr34kyn01535/discord-fs.git
+git clone https://github.com/fr34kyn01535/discord-fs.git
 npm install
 ```
 
