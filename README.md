@@ -24,6 +24,7 @@ npm start
 ```
 
 ## Contributing
+At this point discord-fs is pretty mutch just a POC.
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
