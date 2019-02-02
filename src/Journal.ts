@@ -3,6 +3,7 @@ import * as https from "https";
 import * as path from "path";
 import * as Discord from "discord.js";
 import * as stream from "stream";
+import { stringify } from "querystring";
 
 export const enum JOURNAL_ENTRY_TYPE {
     FILE = 0,
@@ -36,7 +37,16 @@ export class Journal {
     }
 
     public async Load(){
-        var messages = await this.channel.fetchMessages({ limit: 100 });
+        console.log("Fetching initial 100 messages...");
+        var lastMessages = await this.channel.fetchMessages({ limit: 100 });
+        var messages : Array<Discord.Message> = Array.from(lastMessages.values());
+
+        do{
+            lastMessages = await this.channel.fetchMessages({ limit: 100, before:lastMessages.lastKey() });
+            console.log("Fetching " + lastMessages.size+" more messages...");
+            messages = messages.concat(Array.from(lastMessages.values()));
+        } while(lastMessages.size === 100);
+
         return new Promise((resolve, reject) => {
                 messages.filter(m => m.author.id == this.channel.client.user.id).forEach(message => {
                     try {

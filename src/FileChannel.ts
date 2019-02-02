@@ -3,7 +3,7 @@ import * as Mode from "stat-mode";
 import { Journal } from "./Journal";
 import * as fs from "fs";
 import * as split from "fixed-size-stream-splitter";
-import * as CombineStream from "combine-stream";
+import * as MultiStream from "multistream";
 
 export default class FileChannel {
     private guild: Discord.Guild;
@@ -115,22 +115,25 @@ export default class FileChannel {
     } 
     
     public async download(pathName,offset,cb){
+        var that = this;
         var file = this.journal.GetFile(pathName);
         if(file == null){
             var i = 0;
-            var currentPath = pathName+".part" + (i++);
-            var partFile = this.journal.GetFile(currentPath);
+            var currentFile = pathName+".part" + (i++);
+            var partFile = this.journal.GetFile(currentFile);
             if(partFile == null) 
                 return cb("File not found",null);
-            var streams =[];
+            var streams = [];
             while(partFile != null){
-                var res = await this.journal.DownloadFile(currentPath);
+                var res = await that.journal.DownloadFile(currentFile);
+                res.pause();
                 streams.push(res);
-                currentPath = pathName+".part" + (i++);
-                partFile = this.journal.GetFile(currentPath);
+                currentFile = pathName+".part" + (i++);
+                partFile = this.journal.GetFile(currentFile);
             }
-            cb(null,new CombineStream(streams));
-        }else{
+
+            cb(null,MultiStream(streams));
+        }else{ 
             this.journal.DownloadFile(pathName).then((res) => {
                 cb(null,res);
             });
