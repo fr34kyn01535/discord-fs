@@ -69,21 +69,28 @@ export class Journal {
     private files: Array<FileJournalEntry> = new Array<FileJournalEntry>();
 
     public async DownloadFile(filePath) : Promise<stream.Readable> {
+        console.log("DL",filePath);
         return new Promise<stream.Readable>((resolve, reject) => {
             var file = this.GetFile(filePath);
-            if(file == null) return reject("File not found");
-            https.get(file.url, (res) => { resolve(res); });
+            if(file == null) {
+                return reject("File not found");
+            }
+            https.get(file.url, (res) => { resolve(res); }).on("error", reject);
         });
     }
 
+    private normalizePath(p){
+        return path.posix.normalize(p.replace(/\\/g, '/'));
+    }
+
     public GetDirectory(directoryName) : DirectoryJournalEntry{
-        directoryName = path.posix.normalize(directoryName);
+        directoryName = this.normalizePath(directoryName);
         var directory = this.directories.find(d => d.name == directoryName);
         return directory;
     }
 
     public GetFile(filePath) : FileJournalEntry{
-        var directoryName = path.posix.normalize(path.dirname(filePath));
+        var directoryName = this.normalizePath(path.dirname(filePath));
         var fileName = path.basename(filePath);
         var directory = this.directories.find(d => d.name == directoryName);
         if(directory == null) return null;
@@ -97,7 +104,7 @@ export class Journal {
     }
 
     public GetChildDirectories(directoryName) : Array<string> {
-        directoryName = path.posix.normalize(directoryName);
+        directoryName = this.normalizePath(directoryName);
         var children = [];
         this.directories.forEach((item) => {
             if(item.name != directoryName && item.name.startsWith(directoryName) && item.name.trim() != ""){
@@ -125,7 +132,7 @@ export class Journal {
 
     public async CreateFile(filePath: string, content: any): Promise<FileJournalEntry> {
         console.log("Adding file " + filePath);
-        var directoryName = path.posix.normalize(path.dirname(filePath));
+        var directoryName = this.normalizePath(path.dirname(filePath));
         var fileName = path.basename(filePath);
         var directory = this.directories.find(d => d.name == directoryName);
         if (directory == null) directory = await this.CreateDirectory(directoryName);
@@ -150,7 +157,7 @@ export class Journal {
     }
     public async CreateDirectory(directoryName: string): Promise<DirectoryJournalEntry> {
         return new Promise<DirectoryJournalEntry>((resolve, reject) => {
-            directoryName = path.posix.normalize(directoryName);
+            directoryName = this.normalizePath(directoryName);
             var existingDirectory = this.directories.find(d => d.name == directoryName);
             if(existingDirectory != null){
                 console.log("Not recreating directory because it already exists " + directoryName);
@@ -169,7 +176,7 @@ export class Journal {
     }
     public DeleteDirectory(directoryName: string) {
         console.log("Deleting directory " + directoryName);
-        directoryName = path.posix.normalize(directoryName);
+        directoryName = this.normalizePath(directoryName);
         var directory = this.directories.find(d => d.name == directoryName);
         this.directories = this.directories.filter(d => d.id != directory.id);
         return new Promise((resolve, reject) => {

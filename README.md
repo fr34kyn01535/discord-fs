@@ -1,6 +1,6 @@
 # discord-fs
 
-discord-fs is a Discord bot that allows creating a virtual file system accesible via FTP, backed by text-messages for journaling and attachments for storage. The maximum file size limit is 8mb. There is no limit in the amount of files in theory.
+discord-fs is a Discord bot that allows creating a virtual file system accesible via FTP, backed by text-messages for journaling and attachments for storage. The maximum file size limit is 8mb. For bigger files i've implemented multi-part up & download. There is no limit in the amount of files in theory. 
 
 ## Installation
 

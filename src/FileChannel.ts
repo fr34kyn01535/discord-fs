@@ -1,8 +1,9 @@
 import * as Discord from "discord.js";
 import * as Mode from "stat-mode";
 import { Journal } from "./Journal";
-import * as uuidv4 from "uuid/v4";
 import * as fs from "fs";
+import * as split from "fixed-size-stream-splitter";
+import * as CombineStream from "combine-stream";
 
 export default class FileChannel {
     private guild: Discord.Guild;
@@ -39,9 +40,21 @@ export default class FileChannel {
             mode.isDirectory(true);
         }else{
             var file = this.journal.GetFile(pathName);
-            if(file == null) return cb("File not found",null);
-            stat.size = file.size;
-            stat.mtime = <number><any>file.changed;
+            if(file == null){
+                var i = 0;
+                var partFile = this.journal.GetFile(pathName+".part" + (i++));
+                if(partFile == null) return cb("File not found",null);
+                stat.mtime = <number><any>partFile.changed;
+                var totalSize = 0;
+                while(partFile != null){
+                    totalSize += partFile.size;
+                    partFile = this.journal.GetFile(pathName+".part" + (i++));
+                }
+                stat.size = totalSize;
+            }else{
+                stat.size = file.size;
+                stat.mtime = <number><any>file.changed;
+            }
             mode.isFile(true);
         }
         mode.owner.read = true;
@@ -57,24 +70,30 @@ export default class FileChannel {
     }
 
     public readdir(pathName, cb){
-        var files = this.journal.GetFiles(pathName);
+        var files = this.journal.GetFiles(pathName).map(f => f.replace(".part0","")).filter(f => !f.includes(".part"));
         var directories = this.journal.GetChildDirectories(pathName);
         cb(null,files.concat(directories));
     }
 
-    public download(pathName,offset,cb){
-        this.journal.DownloadFile(pathName).then((res) => {
-            cb(null,res);
-        })
-    }
     public mkdir(pathName,cb){
         this.journal.CreateDirectory(pathName);
         cb();
     }
 
-    public unlink(pathName,cb){
+    public async unlink(pathName,cb){
         var file = this.journal.GetFile(pathName);
-        if(file == null) return cb("File not found");
+        if(file == null) {
+            var i = 0;
+            var currentPath = pathName+".part" + (i++);
+            var partFile = this.journal.GetFile(currentPath);
+            if(partFile == null) return cb("File not found",null);
+            while(partFile != null){
+                await this.journal.DeleteFile(currentPath);
+                currentPath = pathName+".part" + (i++)
+                partFile = this.journal.GetFile(currentPath);
+            }
+            cb();
+        }
         else
             this.journal.DeleteFile(pathName).then(() => cb());
     }
@@ -87,15 +106,35 @@ export default class FileChannel {
     }
 
     public upload(pathName, offset, cb){
-        var tempFile = "./tmp/"+ uuidv4();
         var that = this;
-        var fileStream = fs.createWriteStream(tempFile);
-        fileStream.on('finish', function() {
-            that.journal.CreateFile(pathName,fs.readFileSync(tempFile)).then(function(){
-                fs.unlinkSync(tempFile);
-            });
+        var j = 0;
+        var fileStream = split(8e+6, function (stream) {
+            that.journal.CreateFile(pathName+".part"+j++,stream);
         });
         cb(null,fileStream);
+    } 
+    
+    public async download(pathName,offset,cb){
+        var file = this.journal.GetFile(pathName);
+        if(file == null){
+            var i = 0;
+            var currentPath = pathName+".part" + (i++);
+            var partFile = this.journal.GetFile(currentPath);
+            if(partFile == null) 
+                return cb("File not found",null);
+            var streams =[];
+            while(partFile != null){
+                var res = await this.journal.DownloadFile(currentPath);
+                streams.push(res);
+                currentPath = pathName+".part" + (i++);
+                partFile = this.journal.GetFile(currentPath);
+            }
+            cb(null,new CombineStream(streams));
+        }else{
+            this.journal.DownloadFile(pathName).then((res) => {
+                cb(null,res);
+            });
+        }
     }
 }
 
