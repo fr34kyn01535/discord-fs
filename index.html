@@ -1,11 +1,109 @@
-<form method="post" action="/" enctype="multipart/form-data">
-    
-    <div>
-            <input name="path" type="text" value="/"/> 
-    </div>
-    <div>
-            <input name="file" type="file" accept="*"/>
-    </div>
- 
-    <button>Upload</button>
-</form>
+<html>
+    <head>
+        <script src="//code.jquery.com/jquery-3.3.1.min.js"></script>
+        <link  rel="stylesheet" href="//use.fontawesome.com/releases/v5.7.1/css/all.css">
+        <script type="text/javascript">
+            var icons = {
+                image: 'fa-file-image',
+                pdf: 'fa-file-pdf',
+                word: 'fa-file-word',
+                powerpoint: 'fa-file-powerpoint',
+                excel: 'fa-file-excel',
+                audio: 'fa-file-audio',
+                video: 'fa-file-video',
+                zip: 'fa-file-archive',
+                code: 'fa-file-code',
+                text: 'fa-file-alt',
+                file: 'fa-file'
+            }
+
+            var extensions = {
+                gif: icons.image,
+                jpeg: icons.image,
+                jpg: icons.image,
+                png: icons.image,
+
+                pdf: icons.pdf,
+
+                doc: icons.word,
+                docx: icons.word,
+
+                ppt: icons.powerpoint,
+                pptx: icons.powerpoint,
+
+                xls: icons.excel,
+                xlsx: icons.excel,
+
+                aac: icons.audio,
+                mp3: icons.audio,
+                ogg: icons.audio,
+
+                avi: icons.video,
+                flv: icons.video,
+                mkv: icons.video,
+                mp4: icons.video,
+
+                gz: icons.zip,
+                zip: icons.zip,
+
+                css: icons.code,
+                html: icons.code,
+                js: icons.code,
+
+                txt: icons.text,
+
+                file: icons.file
+            }
+
+            var content = {CONTENT};
+            var name = "{NAME}";
+            var nameParts = name.replace(/\//g,"#/#").split("#");
+            nameParts.shift();
+            $(function(){
+                $("#formPath").val(name);
+                var path = "";
+                nameParts.forEach(function(item){
+                    path+=item;
+                    if(item == "/" && path != "/")
+                        $("#folderName").append($("<span>").text(item));
+                    else
+                        $("#folderName").append($("<a>").text(item).attr("href",path));
+                });
+                var prefix = (name.indexOf("/") == 0) ? ((name.length == 1) ? "" : name) : "/" + name;
+                content.forEach(function(item){
+                    if(item.type == "directory"){
+                        $("#folderContent").append($("<li>").addClass("folder").append($("<i>").addClass("fa-li fa fa-folder")).append($("<a>").text(item.name).attr("href",prefix+item.name)));
+                    }
+                     else{
+                         var extension = item.name.slice((item.name.lastIndexOf('.') - 1 >>> 0) + 2);
+                         var icon = extensions[extension];
+                         if(icon == null) icon = "fa-file";
+                        $("#folderContent").append($("<li>").addClass("file").append($("<i>").addClass("fa-li fa " + icon)).append($("<a>").text(item.name).attr("href",prefix+"/"+item.name + "/")));
+                     }
+                 });
+            });
+        </script>
+        <style type="text/css">
+            #folderName a{
+                margin:5px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1 id="folderName"></h1>
+            <ul id="folderContent" class="fa-ul"></ul>
+        </div>
+        <div class="container">
+            <form method="post" action="/" enctype="multipart/form-data">
+        
+                    <input id="formPath" name="path" type="hidden" value="/"/> 
+                <div>
+                    <input name="file" type="file" accept="*"/>
+                </div>
+            
+                <button>Upload</button>
+            </form>
+        </div>
+    </body>
+</html>

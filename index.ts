@@ -5,6 +5,7 @@ import * as express from "express";
 import * as mime from "mime-types";
 import * as busboy from "connect-busboy";
 import * as path from "path";
+import * as fs from "fs";
 
 var app = express();
 var bot = new Discord.Client();
@@ -14,11 +15,9 @@ app.use(busboy({
     highWaterMark: 8e+6
 }));
 
-app.get("/",(req,res) => {
-    res.sendFile('index.html', { root: __dirname });
-});
-
 app.post(/^.*$/,(req,res)=>{
+    if(!fileChannel.journal || !fileChannel) return res.send(500);
+    
     var root = null;//req.originalUrl;
     var file = null;
     var fileName = null;
@@ -48,17 +47,34 @@ app.post(/^.*$/,(req,res)=>{
 })
 
 app.get(/^.*$/,async (req,res)=>{
-    var path = req.originalUrl;
-    var file = fileChannel.journal.GetFile(path);
-    if(file == null) return res.send(404);
-    var stream = await file.Download();
-    if(stream == null) res.send(500);
-    res.header("Content-Type", mime.lookup(path));
-    res.header("Content-Length", file.size.toString());
-    stream.pipe(res);
-    stream.on("close",() =>{
-        res.end();
-    })
+    if(fileChannel == null || fileChannel.journal == null) return res.send(500);
+
+    var filePath = decodeURI(req.originalUrl);
+    var file = fileChannel.journal.GetFile(filePath);
+
+    if(file == null){
+        var directory = fileChannel.journal.GetDirectory(filePath);
+        if(directory != null){
+            res.header("Content-Type", "text/html");
+            var files = fileChannel.journal.GetFiles(directory.name).map(i => <any>{ type:"file", name: i});
+            var directories = fileChannel.journal.GetChildDirectories(directory.name).map(i => <any>{ type:"directory", name: i});
+            var template = fs.readFileSync(path.join(__dirname,'index.html'),"UTF-8");
+            template = template.replace("{CONTENT}",JSON.stringify(files.concat(directories)));
+            template = template.replace("{NAME}",directory.name);
+
+            res.send(template);
+        }else return res.send(404);
+    }
+    else{
+        var stream = await file.Download();
+        if(stream == null) res.send(500);
+        res.header("Content-Type", mime.lookup(filePath));
+        res.header("Content-Length", file.size.toString());
+        stream.pipe(res);
+        stream.on("close",() =>{
+            res.end();
+        })
+    }
 });
 
 if(process.env.HTTP_PORT){

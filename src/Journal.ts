@@ -113,7 +113,9 @@ export class Journal {
     private files: Array<FileJournalEntry> = new Array<FileJournalEntry>();
 
     private normalizePath(p){
-        return path.posix.normalize(p.replace(/\\/g, '/'));
+        var r = path.posix.normalize(p.replace(/\\/g, '/'));
+        if(r.endsWith("/") && r != "/") r = r.slice(0, -1);
+        return r;
     }
 
     public GetDirectory(directoryName) : DirectoryJournalEntry{
@@ -130,8 +132,8 @@ export class Journal {
             if(item.name != directoryName && item.name.startsWith(directoryName) && item.name.trim() != ""){
                 var name = item.name;
                 if(name.indexOf(directoryName) == 0) name = name.substring(directoryName.length);
-                if(name.indexOf("\\") == 0) name = name.substring(1);
-                if(!name.includes("\\")) children.push(name);
+                if(name.indexOf("/") == 0) name = name.substring(1);
+                if(!name.includes("/")) children.push(name);
             }
         });
         return children;
