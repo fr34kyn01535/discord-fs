@@ -3,7 +3,9 @@ import * as https from "https";
 import * as path from "path";
 import * as Discord from "discord.js";
 import * as stream from "stream";
-import { stringify } from "querystring";
+import { Stream } from "stream";
+import * as split from "fixed-size-stream-splitter";
+import * as MultiStream from "multistream";
 
 export const enum JOURNAL_ENTRY_TYPE {
     FILE = 0,
@@ -16,6 +18,38 @@ export class BaseJournalEntry{
     public mid: string
     public changed:Date
     public created:Date
+}
+
+export class File{
+    public journalEntry : FileJournalEntry
+    public directory :DirectoryJournalEntry
+    public parts: FileJournalEntry[]
+    get size() : number {
+        return this.journalEntry.size + this.parts.map(a => a.size).reduce((a, b) => a + b, 0);
+    }
+
+    public async Download() : Promise<stream.Readable> {
+        return new Promise<stream.Readable>(async (resolve, reject) => {
+            try{
+                var files = [this.journalEntry].concat(this.parts);
+                var streams = [];
+                for(var f of files){
+                    var res = await this.downloadFile(f.url);
+                    res.pause();
+                    streams.push(res);
+                }
+                resolve(MultiStream(streams));
+            }catch(e){
+                reject(e);
+            }
+        });
+    }
+
+    private async downloadFile(url: string) : Promise<stream.Readable> {
+        return new Promise<stream.Readable>((resolve, reject) => {
+            https.get(url, (res) => { resolve(res); }).on("error", reject);
+        });
+    }
 }
 
 export class FileJournalEntry extends BaseJournalEntry {
@@ -78,17 +112,6 @@ export class Journal {
     private directories: Array<DirectoryJournalEntry> = new Array<DirectoryJournalEntry>();
     private files: Array<FileJournalEntry> = new Array<FileJournalEntry>();
 
-    public async DownloadFile(filePath) : Promise<stream.Readable> {
-        console.log("DL",filePath);
-        return new Promise<stream.Readable>((resolve, reject) => {
-            var file = this.GetFile(filePath);
-            if(file == null) {
-                return reject("File not found");
-            }
-            https.get(file.url, (res) => { resolve(res); }).on("error", reject);
-        });
-    }
-
     private normalizePath(p){
         return path.posix.normalize(p.replace(/\\/g, '/'));
     }
@@ -99,19 +122,6 @@ export class Journal {
         return directory;
     }
 
-    public GetFile(filePath) : FileJournalEntry{
-        var directoryName = this.normalizePath(path.dirname(filePath));
-        var fileName = path.basename(filePath);
-        var directory = this.directories.find(d => d.name == directoryName);
-        if(directory == null) return null;
-        return  this.files.find(f => f.directory == directory.id && f.name == fileName);
-    }
-
-    public GetFiles(directoryName) : Array<string> {
-        var directory = this.GetDirectory(directoryName);
-        if(directory == null) return [];
-        return this.files.filter(f => f.directory == directory.id).map(f => f.name);
-    }
 
     public GetChildDirectories(directoryName) : Array<string> {
         directoryName = this.normalizePath(directoryName);
@@ -127,29 +137,64 @@ export class Journal {
         return children;
     }
 
-    public async DeleteFile(filePath: string){
-        console.log("Deleting file " + filePath);
-        var fileName = path.basename(filePath);
-        var directory = this.GetDirectory(path.dirname(filePath));
-        return new Promise<FileJournalEntry>((resolve, reject) => {
-            if(directory == null) return reject("Directory doesnt exist");
-            var file = this.files.find(f => f.directory == directory.id && f.name == fileName);
-            if(file == null) return reject("File doesnt exist");
-            this.files = this.files.filter(f => f.mid != file.mid);
-            this.channel.messages.get(file.mid).delete().then(() => resolve()).catch(reject);
-        });
-    }
-
-    public async CreateFile(filePath: string, content: any): Promise<FileJournalEntry> {
-        console.log("Adding file " + filePath);
+    public GetFile(filePath) : File{
         var directoryName = this.normalizePath(path.dirname(filePath));
         var fileName = path.basename(filePath);
         var directory = this.directories.find(d => d.name == directoryName);
-        if (directory == null) directory = await this.CreateDirectory(directoryName);
-        if(this.files.find(f => f.directory == directory.id && f.name == fileName)){
-            await this.DeleteFile(filePath);
-        }
-        return new Promise<FileJournalEntry>((resolve, reject) => {
+        if(directory == null) return null;
+        var file = new File();
+        file.journalEntry = this.files.find(f => f.directory == directory.id && f.name == fileName);
+        if(file.journalEntry == null) return null;
+        file.parts = this.files.filter(f => f.directory == directory.id && f.name.indexOf(fileName+ ".part") == 0)
+            .sort((a,b) => parseInt(a.name.split(".part").pop()) - parseInt(b.name.split(".part").pop()));
+        file.directory = directory;
+        return file;
+    }
+
+    public GetFiles(directoryName, ignorePartFiles = true) : Array<string> {
+        var directory = this.GetDirectory(directoryName);
+        if(directory == null) return [];
+        var files = this.files.filter(f => f.directory == directory.id).map(f => f.name);
+        if(ignorePartFiles) files = files.map(f => f.replace(".part0","")).filter(f => !f.includes(".part"));
+        return files;
+    }
+
+    public async DeleteFile(filePath: string){
+        return new Promise<FileJournalEntry>(async (resolve, reject) => {
+            console.log("Deleting file " + filePath);
+            var file = this.GetFile(filePath);
+            if(file == null) return reject("File not found");
+            var files : FileJournalEntry[] = [file.journalEntry].concat(file.parts);
+            for(var f of files){
+                this.files = this.files.filter(f => f.mid != file.journalEntry.mid);
+                var message = await this.channel.messages.get(file.journalEntry.mid);
+                if(message != null) message.delete();
+            }
+            resolve();
+        });
+    }
+
+    public async CreateFile(filePath: string): Promise<Stream> {
+        var that = this;
+        return new Promise<Stream>((resolve, reject) => {
+            var j = 0;
+            resolve(split(8e+6, function (stream) {
+                that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream);
+                j++;
+            }));
+        });
+    };
+
+    private async createFile(filePath: string, content: Stream): Promise<FileJournalEntry> {
+        return new Promise<FileJournalEntry>(async (resolve, reject) => {
+            console.log("Adding file " + filePath);
+            var directoryName = this.normalizePath(path.dirname(filePath));
+            var fileName = path.basename(filePath);
+            var directory = this.directories.find(d => d.name == directoryName);
+            if (directory == null) directory = await this.CreateDirectory(directoryName);
+            if(this.files.find(f => f.directory == directory.id && f.name == fileName)){
+                await this.DeleteFile(filePath);
+            }
             var entry: FileJournalEntry = new FileJournalEntry();
             entry.directory = directory.id;
             entry.name = fileName;
@@ -165,6 +210,7 @@ export class Journal {
             }).catch(reject);
         });
     }
+
     public async CreateDirectory(directoryName: string): Promise<DirectoryJournalEntry> {
         return new Promise<DirectoryJournalEntry>((resolve, reject) => {
             directoryName = this.normalizePath(directoryName);

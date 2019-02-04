@@ -2,13 +2,12 @@ import * as Discord from "discord.js";
 import * as Mode from "stat-mode";
 import { Journal } from "./Journal";
 import * as fs from "fs";
-import * as split from "fixed-size-stream-splitter";
-import * as MultiStream from "multistream";
+import { Stream } from "stream";
 
 export default class FileChannel {
     private guild: Discord.Guild;
     private channel: Discord.TextChannel; 
-    private journal: Journal;
+    public journal: Journal;
     constructor(client: Discord.Client ,guild: string,channel: string){
         if(!fs.existsSync("./tmp")) fs.mkdirSync("./tmp");
         client.on('ready',() => {
@@ -17,7 +16,7 @@ export default class FileChannel {
            this.channel = <Discord.TextChannel> this.guild.channels.get(channel);
            this.journal = new Journal(this.channel); 
            this.loadJournal();
-        });
+        }); 
 
         client.on('message',function(message){
             if(message.channel.id != channel) return;
@@ -29,7 +28,7 @@ export default class FileChannel {
         if(this.journal.GetDirectory("/") == null) this.journal.CreateDirectory("/");
     }
 
-    public stat(pathName,cb){
+    public stat(pathName:string ,cb :(err?: string,stats?: VirtualStats) => void){
         var directoryEntry = this.journal.GetDirectory(pathName);
         var stat = new VirtualStats(); 
         stat.uname= 'Discord';
@@ -38,22 +37,14 @@ export default class FileChannel {
 
         if(directoryEntry != null){
             mode.isDirectory(true);
+            stat.size = 0;
         }else{
             var file = this.journal.GetFile(pathName);
             if(file == null){
-                var i = 0;
-                var partFile = this.journal.GetFile(pathName+".part" + (i++));
-                if(partFile == null) return cb("File not found",null);
-                stat.mtime = <number><any>partFile.changed;
-                var totalSize = 0;
-                while(partFile != null){
-                    totalSize += partFile.size;
-                    partFile = this.journal.GetFile(pathName+".part" + (i++));
-                }
-                stat.size = totalSize;
+                return cb("File not found",null);
             }else{
                 stat.size = file.size;
-                stat.mtime = <number><any>file.changed;
+                stat.mtime = <number><any>file.journalEntry.changed;
             }
             mode.isFile(true);
         }
@@ -69,75 +60,48 @@ export default class FileChannel {
         cb(null,stat);
     }
 
-    public readdir(pathName, cb){
-        var files = this.journal.GetFiles(pathName).map(f => f.replace(".part0","")).filter(f => !f.includes(".part"));
+    public readdir(pathName:string ,cb :(err?: string,files?: Array<string>) => void){
+        var files = this.journal.GetFiles(pathName);
         var directories = this.journal.GetChildDirectories(pathName);
         cb(null,files.concat(directories));
     }
 
-    public mkdir(pathName,cb){
+    public mkdir(pathName:string ,cb :(err?: string) => void){
         this.journal.CreateDirectory(pathName);
         cb();
     }
 
-    public async unlink(pathName,cb){
+    public async unlink(pathName:string ,cb :(err?: string) => void){
         var file = this.journal.GetFile(pathName);
         if(file == null) {
-            var i = 0;
-            var currentPath = pathName+".part" + (i++);
-            var partFile = this.journal.GetFile(currentPath);
-            if(partFile == null) return cb("File not found",null);
-            while(partFile != null){
-                await this.journal.DeleteFile(currentPath);
-                currentPath = pathName+".part" + (i++)
-                partFile = this.journal.GetFile(currentPath);
-            }
-            cb();
+            return cb("File not found");
         }
         else
-            this.journal.DeleteFile(pathName).then(() => cb());
+            this.journal.DeleteFile(pathName).then(() => cb()).catch((err) => cb(err));
     }
 
-    public rmdir(pathName,cb){
+    public rmdir(pathName:string ,cb :(err?: string) => void){
         var directory = this.journal.GetDirectory(pathName);
         if(directory == null) return cb("Directory not found");
         else
             this.journal.DeleteDirectory(pathName).then(() => cb());
     }
 
-    public upload(pathName, offset, cb){
-        var that = this;
-        var j = 0;
-        var fileStream = split(8e+6, function (stream) {
-            that.journal.CreateFile(pathName+".part"+j++,stream);
+    public upload(pathName:string , offset, cb :(err?: string,stream?: Stream ) => void){
+        this.journal.CreateFile(pathName).then((stream)=>{
+            cb(null,stream);
         });
-        cb(null,fileStream);
     } 
     
-    public async download(pathName,offset,cb){
-        var that = this;
+    public async download(pathName:string ,offset,cb :(err?: string,stream?: Stream ) => void){
         var file = this.journal.GetFile(pathName);
-        if(file == null){
-            var i = 0;
-            var currentFile = pathName+".part" + (i++);
-            var partFile = this.journal.GetFile(currentFile);
-            if(partFile == null) 
-                return cb("File not found",null);
-            var streams = [];
-            while(partFile != null){
-                var res = await that.journal.DownloadFile(currentFile);
-                res.pause();
-                streams.push(res);
-                currentFile = pathName+".part" + (i++);
-                partFile = this.journal.GetFile(currentFile);
-            }
-
-            cb(null,MultiStream(streams));
-        }else{ 
-            this.journal.DownloadFile(pathName).then((res) => {
-                cb(null,res);
+        if(file != null){
+            file.Download().then((stream)=>{
+                cb(null,stream);
+            }).catch((err)=>{
+                cb(err);
             });
-        }
+        }else cb("File not found");
     }
 }
 

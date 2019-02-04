@@ -17,6 +17,7 @@
             "GUILD": "536667092276215811",
             "LISTEN_IP": "127.0.0.1",
             "EXTERNAL_IP": "127.0.0.1",
+            "HTTP_PORT" : "1338",
             "PORT": "1337",
             "TOKEN": "NTM2NjY3MTYzMTQzMTc2MjE5.DyeeSw.VwCQ8nXYLoyRhFA5uGNGc3RxLjI"
         }
