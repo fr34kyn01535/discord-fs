@@ -66,7 +66,7 @@ app.get(/^.*$/,async (req,res)=>{
         }else return res.send(404);
     }
     else{
-        var stream = await file.Download();
+        var stream = await fileChannel.journal.Download(file);
         if(stream == null) res.send(500);
         res.header("Content-Type", mime.lookup(filePath));
         res.header("Content-Length", file.size.toString());

@@ -96,7 +96,7 @@ export default class FileChannel {
     public async download(pathName:string ,offset,cb :(err?: string,stream?: Stream ) => void){
         var file = this.journal.GetFile(pathName);
         if(file != null){
-            file.Download().then((stream)=>{
+            this.journal.Download(file).then((stream)=>{
                 cb(null,stream);
             }).catch((err)=>{
                 cb(err);

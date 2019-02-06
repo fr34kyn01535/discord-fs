@@ -1,11 +1,12 @@
-import * as uuidv4 from "uuid/v4";
-import * as https from "https";
-import * as path from "path";
+import * as crypto from "crypto";
 import * as Discord from "discord.js";
+import * as split from "fixed-size-stream-splitter";
+import * as https from "https";
+import * as MultiStream from "multistream";
+import * as path from "path";
 import * as stream from "stream";
 import { Stream } from "stream";
-import * as split from "fixed-size-stream-splitter";
-import * as MultiStream from "multistream";
+import * as uuidv4 from "uuid/v4";
 
 export const enum JOURNAL_ENTRY_TYPE {
     FILE = 0,
@@ -27,35 +28,13 @@ export class File{
     get size() : number {
         return this.journalEntry.size + this.parts.map(a => a.size).reduce((a, b) => a + b, 0);
     }
-
-    public async Download() : Promise<stream.Readable> {
-        return new Promise<stream.Readable>(async (resolve, reject) => {
-            try{
-                var files = [this.journalEntry].concat(this.parts);
-                var streams = [];
-                for(var f of files){
-                    var res = await this.downloadFile(f.url);
-                    res.pause();
-                    streams.push(res);
-                }
-                resolve(MultiStream(streams));
-            }catch(e){
-                reject(e);
-            }
-        });
-    }
-
-    private async downloadFile(url: string) : Promise<stream.Readable> {
-        return new Promise<stream.Readable>((resolve, reject) => {
-            https.get(url, (res) => { resolve(res); }).on("error", reject);
-        });
-    }
 }
 
 export class FileJournalEntry extends BaseJournalEntry {
     public readonly type : JOURNAL_ENTRY_TYPE = JOURNAL_ENTRY_TYPE.FILE;
     public directory: any
     public url: string
+    public iv: string
     public size: number
 }
 
@@ -64,11 +43,37 @@ export class DirectoryJournalEntry extends BaseJournalEntry {
     public id: any
 }
 
+
 export class Journal {
-    private channel: Discord.TextChannel;
+    private aesKey = crypto.createHash('md5').update(process.env.AES_KEY,"utf8").digest("hex").slice(0, 32);
+
+    encrypt(text:string) : string {
+        var iv = crypto.randomBytes(16);
+        var cipher = crypto.createCipheriv("aes-256-cbc",this.aesKey,iv);
+        return iv.toString("hex") + cipher.update(Buffer.from(text,"utf-8"),"utf8","hex") + cipher.final("hex");
+      }
+       
+    decrypt(text:string) : string{
+        var b = Buffer.from(text, "hex");
+        var iv = b.slice(0,16);
+        var data = b.slice(16,b.length);
+        var decipher = crypto.createDecipheriv("aes-256-cbc",this.aesKey,iv);
+        return decipher.update(data).toString() + decipher.final().toString();
+    }
+
     constructor(channel: Discord.TextChannel) {
         this.channel = channel;
     }
+
+    getCipher(iv){
+        return crypto.createCipheriv("aes-256-cbc",this.aesKey,iv);
+    }
+
+    getDecipher(iv){
+        return crypto.createDecipheriv("aes-256-cbc",this.aesKey,iv);
+    }
+
+    private channel: Discord.TextChannel;
 
     public async Load(){
         console.log("Fetching initial 100 messages...");
@@ -84,7 +89,15 @@ export class Journal {
         return new Promise((resolve, reject) => {
                 messages.filter(m => m.author.id == this.channel.client.user.id).forEach(message => {
                     try {
-                        var entry = JSON.parse(message.content);
+                        var entry = null;
+
+                        if(this.aesKey != null){
+                            var content = this.decrypt(message.content);
+                            entry = JSON.parse(content);
+                        }else{
+                            entry = JSON.parse(message.content);
+                        }
+
                         if (entry.type == JOURNAL_ENTRY_TYPE.DIRECTORY) {
                             var directory :DirectoryJournalEntry = <DirectoryJournalEntry>Object.assign(new DirectoryJournalEntry(), entry)
                             directory.mid = message.id;
@@ -116,6 +129,36 @@ export class Journal {
         var r = path.posix.normalize(p.replace(/\\/g, '/'));
         if(r.endsWith("/") && r != "/") r = r.slice(0, -1);
         return r;
+    }
+
+    
+    public async Download(file: File ) : Promise<stream.Readable> {
+        var that = this;
+        return new Promise<stream.Readable>(async (resolve, reject) => {
+            try{
+                var files = [file.journalEntry].concat(file.parts);
+                var streams = [];
+                for(var f of files){
+                    var res = await this.downloadFile(f.url);
+                    
+                    if(that.aesKey == null){
+                        res.pause();
+                        streams.push(res);
+                    }else{
+                        res.pause();
+                        streams.push(res.pipe(that.getDecipher(Buffer.from(f.iv,"hex"))));
+                    }
+                }
+                resolve(MultiStream(streams));
+            }catch(e){
+                reject(e);
+            }
+        });
+    }
+    
+
+    private async downloadFile(url: string) : Promise<stream.Readable> {
+        return new Promise<stream.Readable>((resolve, reject) => { https.get(url, resolve).on("error", reject); });
     }
 
     public GetDirectory(directoryName) : DirectoryJournalEntry{
@@ -181,13 +224,18 @@ export class Journal {
         return new Promise<Stream>((resolve, reject) => {
             var j = 0;
             resolve(split(8e+6, function (stream) {
-                that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream);
+                if(that.aesKey != null){
+                    var iv = crypto.randomBytes(16);
+                    that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream.pipe(that.getCipher(iv)),iv);
+                }else{
+                    that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream);
+                }
                 j++;
             }));
         });
     };
 
-    private async createFile(filePath: string, content: Stream): Promise<FileJournalEntry> {
+    private async createFile(filePath: string, content: Stream, iv: Buffer = null): Promise<FileJournalEntry> {
         return new Promise<FileJournalEntry>(async (resolve, reject) => {
             console.log("Adding file " + filePath);
             var directoryName = this.normalizePath(path.dirname(filePath));
@@ -198,10 +246,21 @@ export class Journal {
                 await this.DeleteFile(filePath);
             }
             var entry: FileJournalEntry = new FileJournalEntry();
+            if(iv != null)
+                entry.iv = iv.toString("hex");
             entry.directory = directory.id;
             entry.name = fileName;
-            this.channel.send(JSON.stringify(entry), {
-                files: [new Discord.Attachment(content, fileName)]
+
+            var text = JSON.stringify(entry);
+            var attachmentName = fileName;
+
+            if(this.aesKey != null){
+                text = this.encrypt(text);
+                attachmentName = this.encrypt(attachmentName);
+            }
+
+            this.channel.send(text, {
+                files: [new Discord.Attachment(content, attachmentName)]
             }).then((message: Discord.Message) => { 
                 var attachment = message.attachments.first();
                 entry.size = attachment.filesize;
@@ -225,7 +284,11 @@ export class Journal {
             var entry = new DirectoryJournalEntry();
             entry.id = uuidv4();
             entry.name = directoryName;
-            this.channel.send(JSON.stringify(entry)).then((message: Discord.Message) => {
+            var text = JSON.stringify(entry);
+            if(this.aesKey != null){
+                text = this.encrypt(text);
+            }
+            this.channel.send(text).then((message: Discord.Message) => {
                 entry.mid = message.id;
                 this.directories.push(entry);
                 return resolve(entry);
@@ -250,3 +313,4 @@ export class Journal {
         });
     }
 }
+
