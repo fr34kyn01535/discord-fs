@@ -45,7 +45,7 @@ export class DirectoryJournalEntry extends BaseJournalEntry {
 
 
 export class Journal {
-    private aesKey = crypto.createHash('md5').update(process.env.AES_KEY,"utf8").digest("hex").slice(0, 32);
+    private aesKey = process.env.AES_KEY ? crypto.createHash('md5').update(process.env.AES_KEY,"utf8").digest("hex").slice(0, 32) : null;
 
     encrypt(text:string) : string {
         var iv = crypto.randomBytes(16);
