@@ -78,7 +78,7 @@
                          var extension = item.name.slice((item.name.lastIndexOf('.') - 1 >>> 0) + 2);
                          var icon = extensions[extension];
                          if(icon == null) icon = "fa-file";
-                        $("#folderContent").append($("<li>").addClass("file").append($("<i>").addClass("fa-li fa " + icon)).append($("<a>").text(item.name).attr("href",prefix+"/"+item.name + "/")));
+                        $("#folderContent").append($("<li>").addClass("file").append($("<i>").addClass("fa-li fa " + icon)).append($("<a>").text(item.name).attr("href",prefix+"/"+item.name)));
                      }
                  });
             });

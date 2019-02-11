@@ -3,7 +3,9 @@
         "target": "es6",
         "module": "commonjs",
         "sourceMap": true,
-        "watch": true
+        "watch": true,
+        "alwaysStrict": true,
+    
     },
     "compileOnSave": true
 }

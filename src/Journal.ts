@@ -44,7 +44,7 @@ export class DirectoryJournalEntry extends BaseJournalEntry {
 }
 
 
-export class Journal {
+export default class Journal {
     private aesKey = process.env.AES_KEY ? crypto.createHash('md5').update(process.env.AES_KEY,"utf8").digest("hex").slice(0, 32) : null;
 
     encrypt(text:string) : string {
@@ -75,24 +75,26 @@ export class Journal {
 
     private channel: Discord.TextChannel;
 
-    public async Load(){
-        console.log("Fetching initial 100 messages...");
+    public async Load() : Promise<Journal> {
+        var that: Journal = this;
         var lastMessages = await this.channel.fetchMessages({ limit: 100 });
         var messages : Array<Discord.Message> = Array.from(lastMessages.values());
+        console.info("Fetched "+messages.length +" journal entries");
 
-        do{
+        while(lastMessages.size === 100)
+        {
             lastMessages = await this.channel.fetchMessages({ limit: 100, before:lastMessages.lastKey() });
-            console.log("Fetching " + lastMessages.size+" more messages...");
             messages = messages.concat(Array.from(lastMessages.values()));
-        } while(lastMessages.size === 100);
+            console.info("Fetched "+lastMessages.size +" more journal entries");
+        }
 
-        return new Promise((resolve, reject) => {
-                messages.filter(m => m.author.id == this.channel.client.user.id).forEach(message => {
+        return new Promise<Journal>((resolve, reject) => {
+                messages.filter(m => m.author.id == that.channel.client.user.id).forEach(message => {
                     try {
                         var entry = null;
 
-                        if(this.aesKey != null){
-                            var content = this.decrypt(message.content);
+                        if(that.aesKey != null){
+                            var content = that.decrypt(message.content);
                             entry = JSON.parse(content);
                         }else{
                             entry = JSON.parse(message.content);
@@ -102,7 +104,7 @@ export class Journal {
                             var directory :DirectoryJournalEntry = <DirectoryJournalEntry>Object.assign(new DirectoryJournalEntry(), entry)
                             directory.mid = message.id;
                             directory.changed = message.createdAt;
-                            this.directories.push(directory);
+                            that.directories.push(directory);
                         }
                         if (entry.type == JOURNAL_ENTRY_TYPE.FILE) {
                             var attachment = message.attachments.first();
@@ -111,14 +113,16 @@ export class Journal {
                             file.url = attachment.url;
                             file.mid = message.id;
                             file.changed = message.createdAt;
-                            this.files.push(file);
+                            that.files.push(file);
                         }
                     }
                     catch (e) {
                         console.error("Couldn't parse journal entry: " + message.content);
                     }
                 });
-                resolve();
+                
+                if(that.GetDirectory("/") == null) that.CreateDirectory("/");
+                resolve(that);
         });
     }
 
@@ -139,7 +143,7 @@ export class Journal {
                 var files = [file.journalEntry].concat(file.parts);
                 var streams = [];
                 for(var f of files){
-                    var res = await this.downloadFile(f.url);
+                    var res = await that.downloadFile(f.url);
                     
                     if(that.aesKey == null){
                         res.pause();
@@ -182,7 +186,7 @@ export class Journal {
         return children;
     }
 
-    public GetFile(filePath) : File{
+    public GetFile(filePath) : File {
         var directoryName = this.normalizePath(path.dirname(filePath));
         var fileName = path.basename(filePath);
         var directory = this.directories.find(d => d.name == directoryName);
@@ -204,46 +208,43 @@ export class Journal {
         return files;
     }
 
-    public async DeleteFile(filePath: string){
-        return new Promise<FileJournalEntry>(async (resolve, reject) => {
-            console.log("Deleting file " + filePath);
-            var file = this.GetFile(filePath);
-            if(file == null) return reject("File not found");
-            var files : FileJournalEntry[] = [file.journalEntry].concat(file.parts);
-            for(var f of files){
-                this.files = this.files.filter(f => f.mid != file.journalEntry.mid);
-                var message = await this.channel.messages.get(file.journalEntry.mid);
-                if(message != null) message.delete();
-            }
-            resolve();
-        });
+    public async DeleteFile(filePath: string) {
+        console.log("Deleting file " + filePath);
+        var file = this.GetFile(filePath);
+        if(file == null) return Promise.reject(new Error("File not found"));
+        var files : FileJournalEntry[] = [file.journalEntry].concat(file.parts);
+        var promises = [];
+        for(var f of files){
+            this.files = this.files.filter(f => f.mid != file.journalEntry.mid);
+            var message = await this.channel.messages.get(file.journalEntry.mid);
+            if(message != null) promises.push(message.delete());
+        }
+        return Promise.all(promises).then(()=>{}); //Hihi, penis.
     }
 
     public async CreateFile(filePath: string): Promise<Stream> {
+        var j = 0;
         var that = this;
-        return new Promise<Stream>((resolve, reject) => {
-            var j = 0;
-            resolve(split(8e+6, function (stream) {
-                if(that.aesKey != null){
-                    var iv = crypto.randomBytes(16);
-                    that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream.pipe(that.getCipher(iv)),iv);
-                }else{
-                    that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream);
-                }
-                j++;
-            }));
-        });
+        return Promise.resolve(split(8e+6, function (stream) {
+            if(that.aesKey != null){
+                var iv = crypto.randomBytes(16);
+                that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream.pipe(that.getCipher(iv)),iv);
+            }else{
+                that.createFile(filePath + (j == 0 ? "" : ".part"+ j),stream);
+            }
+            j++;
+        }));
     };
 
     private async createFile(filePath: string, content: Stream, iv: Buffer = null): Promise<FileJournalEntry> {
+        var that = this;
         return new Promise<FileJournalEntry>(async (resolve, reject) => {
-            console.log("Adding file " + filePath);
-            var directoryName = this.normalizePath(path.dirname(filePath));
+            var directoryName = that.normalizePath(path.dirname(filePath));
             var fileName = path.basename(filePath);
-            var directory = this.directories.find(d => d.name == directoryName);
-            if (directory == null) directory = await this.CreateDirectory(directoryName);
-            if(this.files.find(f => f.directory == directory.id && f.name == fileName)){
-                await this.DeleteFile(filePath);
+            var directory = that.directories.find(d => d.name == directoryName);
+            if (directory == null) directory = await that.CreateDirectory(directoryName);
+            if(that.files.find(f => f.directory == directory.id && f.name == fileName)){
+                await that.DeleteFile(filePath);
             }
             var entry: FileJournalEntry = new FileJournalEntry();
             if(iv != null)
@@ -254,28 +255,29 @@ export class Journal {
             var text = JSON.stringify(entry);
             var attachmentName = fileName;
 
-            if(this.aesKey != null){
-                text = this.encrypt(text);
-                attachmentName = this.encrypt(attachmentName);
+            if(that.aesKey != null){
+                 text = that.encrypt(text);
+                attachmentName = that.encrypt(attachmentName);
             }
 
-            this.channel.send(text, {
+            that.channel.send(text, {
                 files: [new Discord.Attachment(content, attachmentName)]
             }).then((message: Discord.Message) => { 
                 var attachment = message.attachments.first();
                 entry.size = attachment.filesize;
                 entry.url = attachment.url;
                 entry.mid = message.id;
-                this.files.push(entry);
+                that.files.push(entry);
                 return resolve(entry);
             }).catch(reject);
         });
     }
 
     public async CreateDirectory(directoryName: string): Promise<DirectoryJournalEntry> {
+        var that = this;
         return new Promise<DirectoryJournalEntry>((resolve, reject) => {
-            directoryName = this.normalizePath(directoryName);
-            var existingDirectory = this.directories.find(d => d.name == directoryName);
+            directoryName = that.normalizePath(directoryName);
+            var existingDirectory = that.directories.find(d => d.name == directoryName);
             if(existingDirectory != null){
                 console.log("Not recreating directory because it already exists " + directoryName);
                 return resolve(existingDirectory);
@@ -285,17 +287,18 @@ export class Journal {
             entry.id = uuidv4();
             entry.name = directoryName;
             var text = JSON.stringify(entry);
-            if(this.aesKey != null){
-                text = this.encrypt(text);
+            if(that.aesKey != null){
+                text = that.encrypt(text);
             }
-            this.channel.send(text).then((message: Discord.Message) => {
+            that.channel.send(text).then((message: Discord.Message) => {
                 entry.mid = message.id;
-                this.directories.push(entry);
+                that.directories.push(entry);
                 return resolve(entry);
             }).catch(reject);
         });
     }
-    public DeleteDirectory(directoryName: string) {
+
+    public async DeleteDirectory(directoryName: string) {
         console.log("Deleting directory " + directoryName);
         directoryName = this.normalizePath(directoryName);
         var directory = this.directories.find(d => d.name == directoryName);
@@ -306,10 +309,10 @@ export class Journal {
                 if (journalEntry != null)
                     journalEntry.delete().then(resolve).catch(reject);
                 else
-                    reject("Journal entry not found (async?)");
+                    reject(new Error("Journal entry not found (async?)"));
             }
             else
-                reject("Directory not found in journal");
+                reject(new Error("Directory not found in journal"));
         });
     }
 }

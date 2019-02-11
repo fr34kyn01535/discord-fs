@@ -19,6 +19,7 @@
     "discord.js": "git+https://github.com/discordjs/discord.js.git#11.4-dev",
     "express": "^4.16.4",
     "fixed-size-stream-splitter": "^1.1.0",
+    "fuse-bindings": "^2.11.2",
     "mime-types": "^2.1.21",
     "multistream": "^2.1.1",
     "simple-ftpd": "git+https://github.com/fr34kyn01535/simple-ftpd.git",

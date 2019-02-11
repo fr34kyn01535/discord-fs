@@ -1,33 +1,68 @@
-import * as Discord from "discord.js";
-import * as Mode from "stat-mode";
-import { Journal } from "./Journal";
-import * as fs from "fs";
+import * as ftpd from "simple-ftpd";
+import Journal from "../Journal";
 import { Stream } from "stream";
+import * as Mode from "stat-mode";
 
-export default class FileChannel {
-    private guild: Discord.Guild;
-    private channel: Discord.TextChannel; 
-    public journal: Journal;
-    constructor(client: Discord.Client ,guild: string,channel: string){
-        if(!fs.existsSync("./tmp")) fs.mkdirSync("./tmp");
-        client.on('ready',() => {
-            console.log("Connected to Discord...");
-           this.guild = client.guilds.get(guild);
-           this.channel = <Discord.TextChannel> this.guild.channels.get(channel);
-           this.journal = new Journal(this.channel); 
-           this.loadJournal();
-        }); 
-
-        client.on('message',function(message){
-            if(message.channel.id != channel) return;
-            if(message.type == "PINS_ADD") message.delete();
-        })
+class VirtualStats{
+    constructor(){
+        this.size = 1;
+        this.mtime = Date.now();
+        this.uname= 'Discord';
+        this.gname= 'Tester';
+        var mode = new Mode(this);
+        mode.owner.read = true;
+        mode.owner.write = true;
+        mode.owner.execute = true;
+        mode.group.read = true;
+        mode.group.write = true;
+        mode.group.execute = true;
+        mode.others.read = true;
+        mode.others.write = true;
+        mode.others.execute = true; 
     }
-    private async loadJournal(){
-        await this.journal.Load();
-        if(this.journal.GetDirectory("/") == null) this.journal.CreateDirectory("/");
+    public mtime:number;
+    public mode:number; 
+    public size:number;
+    public uname:string;
+    public gname:string;
+}
+
+export default class FTPFrontend{
+    private instance;
+    private journal: Journal;
+    private host: string;
+    private port: number;
+    private externalHost: string;
+    constructor(journal: Journal, host : string, port: number, externalHost : string){
+        this.journal = journal;
+        this.host = host;
+        this.port = port;
+        this.externalHost = externalHost;
     }
 
+    public async Listen(){
+        this.instance = ftpd({ host: this.host, port: this.port, externalHost: this.externalHost, root: '/' }, (session) => {
+        
+            session.on('pass', (username, password, cb) => {
+                session.readOnly = false
+                cb(null, 'Welcome guest') 
+            })  
+        
+            session.on('stat', this.stat.bind(this));
+            session.on('readdir', this.readdir.bind(this));
+            session.on('read', this.download.bind(this));
+            session.on('write', this.upload.bind(this));
+        
+            session.on('mkdir', this.mkdir.bind(this));
+            session.on('unlink', this.unlink.bind(this));
+            session.on('remove', this.rmdir.bind(this));
+            /*
+                session.on('rename', console.log)
+            */
+        });
+    }
+
+    
     public stat(pathName:string ,cb :(err?: string,stats?: VirtualStats) => void){
         var directoryEntry = this.journal.GetDirectory(pathName);
         var stat = new VirtualStats(); 
@@ -103,30 +138,4 @@ export default class FileChannel {
             });
         }else cb("File not found");
     }
-}
-
-
-
-class VirtualStats{
-    constructor(){
-        this.size = 1;
-        this.mtime = Date.now();
-        this.uname= 'Discord';
-        this.gname= 'Tester';
-        var mode = new Mode(this);
-        mode.owner.read = true;
-        mode.owner.write = true;
-        mode.owner.execute = true;
-        mode.group.read = true;
-        mode.group.write = true;
-        mode.group.execute = true;
-        mode.others.read = true;
-        mode.others.write = true;
-        mode.others.execute = true; 
-    }
-    public mtime:number;
-    public mode:number; 
-    public size:number;
-    public uname:string;
-    public gname:string;
 }
