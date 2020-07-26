@@ -28,7 +28,7 @@ export LISTEN_IP=127.0.0.1 #IP the FTP server will listen on
 export EXTERNAL_IP=127.0.0.1 #IP reported to passive FTP connections (Set it to your external ip)
 export PORT=33333 #Port the FTP server will listen on
 
-export HTTP_PORT=1338#Port the web frontend will listen on
+export HTTP_PORT=1338 #Port the web frontend will listen on
 npm start
 ```
 
