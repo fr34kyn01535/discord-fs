@@ -4,8 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "tsc --build tsconfig.json && node index.js"
   },
   "author": "Sven Mawby",
   "license": "ISC",
@@ -13,18 +12,15 @@
     "@types/connect-busboy": "0.0.0",
     "@types/express": "^4.16.1",
     "@types/node": "^10.12.18",
-    "chalk": "^2.4.2",
     "connect-busboy": "0.0.2",
-    "discord": "^0.8.2",
-    "discord-storage": "^0.1.1",
-    "discord.js": "git+https://github.com/discordjs/discord.js.git#11.4-dev",
+    "discord.js": "11.4.2",
     "express": "^4.16.4",
     "fixed-size-stream-splitter": "^1.1.0",
-    "fuse-bindings": "^2.11.2",
     "mime-types": "^2.1.21",
     "multistream": "^2.1.1",
     "simple-ftpd": "git+https://github.com/fr34kyn01535/simple-ftpd.git",
     "stat-mode": "^0.2.2",
-    "uuid": "^3.3.2"
+    "uuid": "^3.3.2",
+    "fuse-bindings": "^2.11.2"
   }
 }

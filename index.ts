@@ -4,7 +4,6 @@ import FTPFrontend from "./src/frontends/FTPFrontend";
 import FuseFrontend from "./src/frontends/FuseFrontend";
 import Journal from "./src/Journal";
 
-
 var bot = new Discord.Client();
 
 var guildID = process.env.GUILD;
@@ -54,7 +53,7 @@ bot.on('ready',() => {
             });
         }
         if(process.env.MOUNT_PATH){
-            //new FuseFrontend(journal).Mount(process.env.MOUNT_PATH);
+            new FuseFrontend(journal).Mount(process.env.MOUNT_PATH);
         }
    });
 }); 
