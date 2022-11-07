@@ -6,9 +6,7 @@
   "scripts": {
     "start": "tsc --build tsconfig.json && node index.js"
   },
-  "bin": {
-    "discord-fs": "./start.js"
-  },
+  "bin": "./start.js",
   "author": "Sven Mawby",
   "license": "MIT",
   "dependencies": {
