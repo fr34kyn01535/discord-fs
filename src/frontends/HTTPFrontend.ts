@@ -4,79 +4,69 @@ import * as mime from "mime-types";
 import * as busboy from "connect-busboy";
 import * as path from "path";
 import * as fs from "fs";
-import Journal from "../Journal";
+import IFrontend from "./IFrontend";
+import IJournal from "../backend/IJournal";
+import * as stream from "stream";
 
-export default class HTTPFrontend{
-    private app;
-    private journal;
-    private port;
-
-    constructor(journal: Journal, port: number){
-        this.journal = journal;
-        this.port = port;
+export default class HTTPFrontend implements IFrontend{
+    private app: express.Express;
+    private journal: IJournal;
+    constructor(private port: number){
         this.app = express();
         this.app.use(busboy({
             highWaterMark: 8e+6
         }));
-        this.registerRoutes(this.app, this.journal);
     }
 
-    public async Listen() : Promise<HTTPFrontend> {
-        var that = this; 
-        return new Promise<HTTPFrontend>((resolve, reject) => {
-            try{
-                this.app.listen(this.port, function () { resolve(that); }); 
-            }catch(e){
-                reject(e);
-            }
-        })
+    public async start(journal: IJournal) {
+        this.journal = journal;
+        this.registerRoutes();
+        await this.app.listen(this.port);
     }
 
-    private registerRoutes(app, journal){
-        app.post(/^.*$/,(req,res)=>{
-            if(!journal) return res.send(500);
-            
-            var root = null;
-            var file = null;
-            var fileName = null;
+    private upload(root: string, fileName: string, file: stream.Stream, res: any){
+        this.journal.createFile(path.join(root, fileName)).then((stream: stream.Writable) => {
+            stream.on('close', () => {
+                setTimeout(() => {
+                    res.redirect("/");
+                },1000)
+            });
+            file.pipe(stream);
+        });
+    }
+
+    private registerRoutes(){
+        this.app.post(/^.*$/,(req : any, res: any)=>{
+            let root: string = null;
+            let file: stream.Stream = null;
+            let fileName: string = null;
         
-            function upload(){
-                journal.CreateFile(path.join(root, fileName)).then(stream => {
-                    stream.on('close', () => {
-                        res.send(200).end();
-                    });
-                    file.pipe(stream);
-                });
-            }
-        
-            (<any>req).busboy.on('field', function(fieldname, p) {
-                if(fieldname == "path") {
-                    root = p;
-                    if(fileName != null && file != null) upload();
+            req.busboy.on('field', (fn: string, r: string) => {
+                if(fn == "path") {
+                    root = r;
+                    if(fileName != null && file != null) this.upload(root,fileName, file, res);
                 }
             });
         
-            (<any>req).busboy.on('file', (fieldname, f, fn) => {
-                fileName = fn;
+            req.busboy.on('file', (_ : any, f: stream.Stream, fd: any) => {
+                fileName = fd.filename;
                 file = f;
-                if(root != null) upload();
+                if(root != null) this.upload(root,fileName, file, res);
             });
-            req.pipe((<any>req).busboy);
+            req.pipe(req.busboy);
         })
         
-        app.get(/^.*$/,async (req,res)=>{
-            if(journal == null) return res.send(500);
-        
-            var filePath = decodeURI(req.originalUrl);
-            var file = journal.GetFile(filePath);
+        this.app.get(/^.*$/,async (req: any,res : any)=>{
+            let filePath = decodeURI(req.originalUrl);
+            let file = await this.journal.getFile(filePath);
         
             if(file == null){
-                var directory = journal.GetDirectory(filePath);
+                let directory = await this.journal.getDirectory(filePath);
                 if(directory != null){
                     res.header("Content-Type", "text/html");
-                    var files = journal.GetFiles(directory.name).map(i => <any>{ type:"file", name: i});
-                    var directories = journal.GetChildDirectories(directory.name).map(i => <any>{ type:"directory", name: i});
-                    var template = fs.readFileSync(path.join(__dirname,'index.html'),"UTF-8");
+                    let files = (await this.journal.getFiles(directory.name)).map(i => <any>{ type:"file", name: i});
+                    let directories = (await this.journal.getChildDirectories(directory.name)).map(i => <any>{ type:"directory", name: i});
+                    let template = fs.readFileSync(path.join(__dirname,'index.html'),"utf-8");
                     template = template.replace("{CONTENT}",JSON.stringify(files.concat(directories)));
                     template = template.replace("{NAME}",directory.name);
         
@@ -84,7 +74,7 @@ export default class HTTPFrontend{
                 }else return res.send(404);
             }
             else{
-                var stream = await journal.Download(file);
+                let stream = await this.journal.download(file);
                 if(stream == null) res.send(500);
                 res.header("Content-Type", mime.lookup(filePath));
                 stream.pipe(res);

@@ -3,7 +3,7 @@
         <script src="//code.jquery.com/jquery-3.3.1.min.js"></script>
         <link  rel="stylesheet" href="//use.fontawesome.com/releases/v5.7.1/css/all.css">
         <script type="text/javascript">
-            var icons = {
+            let icons = {
                 image: 'fa-file-image',
                 pdf: 'fa-file-pdf',
                 word: 'fa-file-word',
@@ -17,7 +17,7 @@
                 file: 'fa-file'
             }
 
-            var extensions = {
+            let extensions = {
                 gif: icons.image,
                 jpeg: icons.image,
                 jpg: icons.image,
@@ -55,13 +55,13 @@
                 file: icons.file
             }
 
-            var content = {CONTENT};
-            var name = "{NAME}";
-            var nameParts = name.replace(/\//g,"#/#").split("#");
+            let content = {CONTENT};
+            let name = "{NAME}";
+            let nameParts = name.replace(/\//g,"#/#").split("#");
             nameParts.shift();
             $(function(){
                 $("#formPath").val(name);
-                var path = "";
+                let path = "";
                 nameParts.forEach(function(item){
                     path+=item;
                     if(item == "/" && path != "/")
@@ -69,14 +69,14 @@
                     else
                         $("#folderName").append($("<a>").text(item).attr("href",path));
                 });
-                var prefix = (name.indexOf("/") == 0) ? ((name.length == 1) ? "" : name) : "/" + name;
+                let prefix = (name.indexOf("/") == 0) ? ((name.length == 1) ? "" : name) : "/" + name;
                 content.forEach(function(item){
                     if(item.type == "directory"){
                         $("#folderContent").append($("<li>").addClass("folder").append($("<i>").addClass("fa-li fa fa-folder")).append($("<a>").text(item.name).attr("href",prefix+item.name)));
                     }
                      else{
-                         var extension = item.name.slice((item.name.lastIndexOf('.') - 1 >>> 0) + 2);
-                         var icon = extensions[extension];
+                         let extension = item.name.slice((item.name.lastIndexOf('.') - 1 >>> 0) + 2);
+                         let icon = extensions[extension];
                          if(icon == null) icon = "fa-file";
                         $("#folderContent").append($("<li>").addClass("file").append($("<i>").addClass("fa-li fa " + icon)).append($("<a>").text(item.name).attr("href",prefix+"/"+item.name)));
                      }
