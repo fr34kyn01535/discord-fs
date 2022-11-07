@@ -1,7 +1,7 @@
-import Journal from "../Journal";
-import * as Mode from "stat-mode";
-var fuse = require('fuse-bindings')
-
+import * as sm from "stat-mode";
+import IFrontend from "./IFrontend";
+import IJournal from "../backend/IJournal";
+let fuse = require('fuse-bindings')
 
 class FileAttributes{
     constructor(){
@@ -11,7 +11,7 @@ class FileAttributes{
         this.ctime = Date.now();
         this.uid= 0;
         this.gid= 0;
-        var mode = new Mode(this);
+        let mode = new sm.Mode(this);
         mode.owner.read = true;
         mode.owner.write = true;
         mode.owner.execute = true;
@@ -31,28 +31,53 @@ class FileAttributes{
     public gid:number;
 }
 
-export default class FuseFrontend{
-    private journal : Journal;
-    constructor(journal: Journal){
-        this.journal = journal;
+export default class FuseFrontend implements IFrontend{
+    private journal: IJournal
+    constructor(private mountPath : string){
+        
     }
 
-    private readdir(pathName: string, cb : (err:number, files:Array<string>) => void){
-        var files = this.journal.GetFiles(pathName);
-        var directories = this.journal.GetChildDirectories(pathName);
+    public start(journal: IJournal){
+        this.journal = journal;
+        fuse.mount(this.mountPath, {
+            readdir: this.readdir.bind(this),
+            getattr: this.getattr.bind(this),
+            open: function (path: any, flags: any, cb: any) { cb(0, 42)  },
+            read: this.download.bind(this)
+        }, function (err: string) {
+            if (err) throw err
+            console.log('Loaded FuseFrontend on ' + this.mountPath)
+        })
+
+        process.on("SIGINT", function () {
+            fuse.unmount(this.mountPath, function (err: string) {
+                if (err) {
+                    console.log('Filesystem at ' + this.mountPath + ' not unmounted', err)
+                } else {
+                    console.log('Filesystem at ' + this.mountPath + ' unmounted')
+                }
+            })
+            
+            process.exit();
+        });
+    }
+
+    private async readdir(pathName: string, cb : (err:number, files:Array<string>) => void){
+        let files = await this.journal.getFiles(pathName);
+        let directories = await this.journal.getChildDirectories(pathName);
         cb(0,files.concat(directories));
     }
 
-    private getattr(pathName: string, cb : (err:number, attributes:FileAttributes) => void){
-        var directoryEntry = this.journal.GetDirectory(pathName);
-        var attributes = new FileAttributes(); 
-        var mode = new Mode(attributes);
+    private async getattr(pathName: string, cb : (err:number, attributes:FileAttributes) => void){
+        let directoryEntry = await this.journal.getDirectory(pathName);
+        let attributes = new FileAttributes(); 
+        let mode = new sm.Mode(attributes);
 
         if(directoryEntry != null){
             mode.isDirectory(true);
             attributes.size = 0;
         }else{
-            var file = this.journal.GetFile(pathName);
+            let file = await this.journal.getFile(pathName);
             if(file == null){
                 return cb(fuse.ENOENT,null);
             }else{
@@ -77,10 +102,11 @@ export default class FuseFrontend{
     public async download(pathName:string ,fd: number,buffer: Buffer, length:number,position: number,cb :(err: number ) => void){
         //Todo: the os will fetch the first ~4096 bytes to look for a known header, we should cache  either the header or the first 8mb of any file to make this a fast process
 
-        var file = this.journal.GetFile(pathName);
+        let file = await this.journal.getFile(pathName);
         if(file != null){
             console.log(pathName, arguments);
-            this.journal.Download(file).then((stream)=>{
+            try{
+                let stream = await this.journal.download(file);
                 stream.on('data', (data)=> {
                     console.log(data);
                     buffer.write(data);
@@ -88,35 +114,11 @@ export default class FuseFrontend{
                 stream.on('end', function(){
                     cb(0);
                 });
-            }).catch((err)=>{
+            }catch{
                 cb(1);
-            });
+            }
+
         }else cb(fuse.ENOENT);
-    }
-
-    public Mount(mountPath : string){
-
-        fuse.mount(mountPath, {
-            readdir: this.readdir.bind(this),
-            getattr: this.getattr.bind(this),
-            open: function (path, flags, cb) { cb(0, 42)  },
-            read: this.download.bind(this)
-        }, function (err) {
-            if (err) throw err
-            console.log('Loaded FuseFrontend on ' + mountPath)
-        })
-
-        process.on("SIGINT", function () {
-            fuse.unmount(mountPath, function (err) {
-                if (err) {
-                    console.log('Filesystem at ' + mountPath + ' not unmounted', err)
-                } else {
-                    console.log('Filesystem at ' + mountPath + ' unmounted')
-                }
-            })
-            
-            process.exit();
-        });
     }
     
 }

@@ -3,24 +3,26 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
-    "configurations": [{
+    "configurations": [
+        {
         "type": "node",
         "request": "launch",
         "name": "Launch Program",
-        "program": "${workspaceFolder}\\index.js",
+        "program": "${workspaceFolder}\\index.ts",
+        "preLaunchTask": "tsc: build - tsconfig.json",
         "outFiles": [
             "${workspaceFolder}/**/*.js"
         ],
         "env": {
-
-            "CHANNEL": "542292471728570369",
-            "GUILD": "536667092276215811",
+            "CHANNEL": "1039232047245443202",
+            "GUILD": "616275803445133351",
             "LISTEN_IP": "127.0.0.1",
             "EXTERNAL_IP": "127.0.0.1",
             "HTTP_PORT" : "1338",
             "AES_KEY":"BAM~NOBODY~GUESSES_this_:D",
-            "PORT": "1337",
-            "TOKEN": "NTM2NjY3MTYzMTQzMTc2MjE5.DyeeSw.VwCQ8nXYLoyRhFA5uGNGc3RxLjI"
+            "FTP_PORT": "1337",
+            "TOKEN": "th3243424234sadf342fis.aint.my.real.token3214434"
         }
     }]
 }
+
