@@ -6,6 +6,9 @@
   "scripts": {
     "start": "tsc --build tsconfig.json && node index.js"
   },
+  "bin": {
+    "discord-fs": "./start.js"
+  },
   "author": "Sven Mawby",
   "license": "MIT",
   "dependencies": {
@@ -16,6 +19,7 @@
     "multistream": "^4.1.0",
     "simple-ftpd": "git+https://github.com/fr34kyn01535/simple-ftpd.git",
     "stat-mode": "^1.0.0",
+    "ts-node": "^10.9.1",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
