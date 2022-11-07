@@ -40,6 +40,7 @@ npm install
 and then run the code from git repository
 
 ```bash
+#EXAMPLE for your ba/z/shell of choice
 export GUILD=536667092276215811 #The guild snowflake
 export CHANNEL=536667818452582411 #The channel snowflake
 export TOKEN=_6qrZcUqja7812RVdnEKjpzOL4CvHB123qrZcUqja7812RVdnEKjpzOL4CvHBFG #Your discord bot api token
@@ -56,6 +57,7 @@ npm start
 or directly download and launch the bot as-is from GitHub using npx. 
 
 ```powershell
+#EXAMPLE for PowerShell
 $ENV:GUILD="536667092276215811" #The guild snowflake
 $ENV:CHANNEL="536667818452582411" #The channel snowflake
 $ENV:TOKEN="_6qrZcUqja7812RVdnEKjpzOL4CvHB123qrZcUqja7812RVdnEKjpzOL4CvHBFG" #Your discord bot api token
