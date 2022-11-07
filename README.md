@@ -25,7 +25,7 @@ If you haven't already created a discord bot, follow the following steps:
 
 ### Invite the Discord bot to your guild
 4. Complete the following url with your client id:
-    https://discord.com/oauth2/authorize?response_type=code&client_id=<client id>&scope=bot
+    https://discord.com/oauth2/authorize?response_type=code&client_id=(YOUR CLIENT ID HERE)&scope=bot
 5. Navigate to the url and let the bot join your preferred guild
 
 You can obtain your guild and channel snowflake (its id) by enabling developer mode on your Discord client  (User Settings > Advanced > Developer Mode)
