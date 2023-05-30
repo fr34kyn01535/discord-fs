@@ -35,6 +35,7 @@ You can clone or fork this repo and start from there (recommended if you want to
 git clone https://github.com/fr34kyn01535/discord-fs.git
 cd discord-fs
 npm install
+yarn install
 ```
 
 and then run the code from git repository
