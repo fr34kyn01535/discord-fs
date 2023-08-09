@@ -5,7 +5,7 @@ import * as MultiStream from "multistream";
 import * as path from "path";
 import * as stream from "stream";
 import { v4 as uuidv4 } from 'uuid';
-
+import config from "dotenv"
 import IJournal from "./IJournal";
 import { DirectoryJournalEntry } from "./DirectoryJournalEntry";
 import { FileJournalEntry } from "./FileJournalEntry";

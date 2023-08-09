@@ -1,6 +1,6 @@
 import * as Discord from "discord.js";
 import GuildStorageHandler from "./GuildStorageHandler";
-
+import config from "dotenv"
 export default class Bot{
     private bot: Discord.Client
     private storageHandler: GuildStorageHandler;
