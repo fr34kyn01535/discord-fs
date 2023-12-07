@@ -246,7 +246,7 @@ export default class Journal implements IJournal {
     public async createFile(filePath: string): Promise<stream.Writable> {
         let j = 0;
         let that = this;
-        return new SizeStream(25e+6, function (stream) {
+        return new SizeStream(26214400, function (stream) {
             if(that.aesKey != null){
                 let iv = crypto.randomBytes(16);
                 that.createFileImpl(filePath + (j == 0 ? "" : ".part"+ j),stream.pipe(that.getCipher(iv)),iv);

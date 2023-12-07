@@ -1,9 +1,9 @@
 # discord-fs
 
-discord-fs is a Discord bot that allows creating an encrypted virtual file system accesible via FTP, backed by text-messages for journaling and attachments for storage. The maximum file size limit is 8mb. For bigger files i've implemented multi-part up & download. There is no limit in the amount of files in theory. 
+discord-fs is a Discord bot that allows creating an encrypted virtual file system accesible via FTP, backed by text-messages for journaling and attachments for storage. The maximum file size limit is 25MB. For bigger files i've implemented multi-part up & download. There is no limit in the amount of files in theory. 
 
 ## Features
-* Theoretically unlimited file size thanks to splitting the file in 8mb chunks (discord is quite unreliable when it comes to uploading 20 files in a row without any issues)
+* Theoretically unlimited file size thanks to splitting the file in 25MB chunks (discord is quite unreliable when it comes to uploading 20 files in a row without any issues)
 * FTP frontend
 * HTTP frontend (up & downloading) 
     I've disabled it for now because of building complications on windows. You may wanna tinker with it, to enable, uncomment the lines in GuildStorageHandler.ts
@@ -32,45 +32,53 @@ and rightclicking both the guilds name or the specifc channel and choose "Copy I
 
 You can clone or fork this repo and start from there (recommended if you want to make changes).
 ```
-git clone https://github.com/fr34kyn01535/discord-fs.git
+git clone https://github.com/maalos/discord-fs.git
 cd discord-fs
-npm install
+npm i -g yarn
+yarn install
+cp .env.example .env
 ```
 
-and then run the code from git repository
-
-```bash
-#EXAMPLE for your ba/z/shell of choice
-export GUILD=536667092276215811 #The guild snowflake
-export CHANNEL=536667818452582411 #The channel snowflake
-export TOKEN=_6qrZcUqja7812RVdnEKjpzOL4CvHB123qrZcUqja7812RVdnEKjpzOL4CvHBFG #Your discord bot api token
-export AES_KEY=BAM~NOBODY~GUESSES_this_:D #If you don't want encrpytion, keep this empty, otherwise roll a new secret
-
-export LISTEN_IP=127.0.0.1 #IP the FTP server will listen on
-export EXTERNAL_IP=127.0.0.1 #IP reported to passive FTP connections (Set it to your external ip)
-export FTP_PORT=33333 #Port the FTP server will listen on
-export HTTP_PORT=1338 #Port the web frontend will listen on
-
-npm start
-```
+then adjust the values inside `.env`, after that run the code with `npm start`.
 
 or directly download and launch the bot as-is from GitHub using npx. 
 
 ```powershell
 #EXAMPLE for PowerShell
-$ENV:GUILD="536667092276215811" #The guild snowflake
-$ENV:CHANNEL="536667818452582411" #The channel snowflake
-$ENV:TOKEN="_6qrZcUqja7812RVdnEKjpzOL4CvHB123qrZcUqja7812RVdnEKjpzOL4CvHBFG" #Your discord bot api token
-$ENV:AES_KEY="BAM~NOBODY~GUESSES_this_:D" #If you don't want encrpytion, keep this empty, otherwise roll a new secret
+$ENV:GUILD="123412341234123412" #The guild snowflake
+$ENV:CHANNEL="123412341234123412" #The channel snowflake
+$ENV:TOKEN="tokendupadupa123123" #Your discord bot api token
+$ENV:AES_KEY="its a secret" #If you don't want encrpytion, keep this empty, otherwise roll a new secret
 
 $ENV:LISTEN_IP="127.0.0.1" #IP the FTP server will listen on
 $ENV:EXTERNAL_IP="127.0.0.1" #IP reported to passive FTP connections (Set it to your external ip)
-$ENV:FTP_PORT="33333" #Port the FTP server will listen on
-$ENV:HTTP_PORT="1338" #Port the web frontend will listen on
+$ENV:FTP_PORT="2121" #Port the FTP server will listen on
+$ENV:HTTP_PORT="8080" #Port the web frontend will listen on
 
-npx git+https://github.com/fr34kyn01535/discord-fs
+npx git+https://github.com/maalos/discord-fs
 ```
 
+## Weird errors
+Errors such as the one below are related to timeouts. Edit the file on the screenshot below - change 3e4 (30 seconds) to a high value like 30e7 (30000000 ms) so it doesn't occur ever again. Or get better internet.
+```
+/root/.npm/_npx/e50a84c8e0bdb063/node_modules/undici/lib/client.js:1388
+      errorRequest(client, request, err || new RequestAbortedError())
+                                           ^
+RequestAbortedError [AbortError]: Request aborted
+    at RequestHandler.abort (/root/.npm/_npx/e50a84c8e0bdb063/node_modules/undici/lib/client.js:1388:44)
+    at abort (/root/.npm/_npx/e50a84c8e0bdb063/node_modules/undici/lib/api/abort-signal.js:8:10)
+    at AbortSignal.self.<computed> (/root/.npm/_npx/e50a84c8e0bdb063/node_modules/undici/lib/api/abort-signal.js:29:5)
+    at AbortSignal.[nodejs.internal.kHybridDispatch] (node:internal/event_target:736:20)
+    at AbortSignal.dispatchEvent (node:internal/event_target:678:26)
+    at abortSignal (node:internal/abort_controller:292:10)
+    at AbortController.abort (node:internal/abort_controller:323:5)
+    at Timeout.<anonymous> (/root/.npm/_npx/e50a84c8e0bdb063/node_modules/@discordjs/rest/src/lib/handlers/Shared.ts:68:46)
+    at listOnTimeout (node:internal/timers:559:17)
+    at processTimers (node:internal/timers:502:7) {
+  code: 'UND_ERR_ABORTED'
+}
+```
+![timeout-fix](annoying-error-fix.png)
 
 ## Contributing
 At this point discord-fs is pretty mutch just a POC.
