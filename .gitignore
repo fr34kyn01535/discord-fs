@@ -77,3 +77,4 @@ typings/
 *.js
 *.js.map
 tmp/
+*.lock
