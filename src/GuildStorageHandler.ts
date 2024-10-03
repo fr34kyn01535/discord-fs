@@ -4,7 +4,8 @@ import FTPFrontend from "./frontends/FTPFrontend";
 //import FuseFrontend from "./frontends/FuseFrontend";
 import HTTPFrontend from "./frontends/HTTPFrontend";
 import IFrontend from "./frontends/IFrontend";
-
+import config from "dotenv"
+config()
 export default class StorageHandler{
    
     private journal: ChannelAttachmentHandler
